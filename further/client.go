@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"net"
+	"net/http"
 	"time"
 )
 
@@ -11,6 +12,7 @@ import (
 
 const IPAddress = "192.168.240.129:999"
 const netProtocol = "tcp"
+const get = "GET"
 
 func sendMessage(conn *net.TCPConn) {
 	/*同樣申請一個空間*/
@@ -34,7 +36,7 @@ func reciveMessage(conn *net.TCPConn) {
 	}
 }
 
-func main() {
+func socketClient() {
 	var tcpAddr *net.TCPAddr
 	tcpAddr, Connerr := net.ResolveTCPAddr(netProtocol, IPAddress)
 	/*鏈接遠端服務器*/
@@ -46,6 +48,28 @@ func main() {
 	go sendMessage(conn)
 	go reciveMessage(conn)
 	time.Sleep(time.Second * 10)
+}
+
+func DoRequest() {
+	var client = &http.Client{
+		Transport:     nil, /*端口*/
+		CheckRedirect: nil, /**/
+		Jar:           nil, /**/
+		Timeout:       0,   /*超時*/
+	}
+	request, err := http.NewRequest(get, "", nil)
+	if err != nil {
+		fmt.Println(err)
+	}
+	request.Header.Set("", "")
+	response, err2 := client.Do(request)
+	if err2 != nil {
+		fmt.Println(err2)
+	}
+	defer response.Body.Close()
+
+	fmt.Println(response.StatusCode)
+
 }
 
 /*問題一，看Ping的通不,好的根本Ping通,這裡鏈接起來了*/

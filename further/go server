@@ -1,0 +1,119 @@
+package main
+
+import (
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	_ "github.com/go-sql-driver/mysql"
+	"io/ioutil"
+	"net/http"
+)
+
+type DbWorker struct {
+	Dsn string
+	DB  *sql.DB
+}
+
+type Dbplayer struct {
+	Id      int
+	Name    string
+	Itemone int
+	Itemtwo int
+}
+
+func takeData(data []byte) {
+	var playertwo Dbplayer
+	if err := json.Unmarshal(data, &playertwo); err == nil {
+		fmt.Println(playertwo)
+	}
+	conncetMysql(playertwo)
+}
+
+func myfunction(w http.ResponseWriter, r *http.Request) {
+	s, _ := ioutil.ReadAll(r.Body)
+	fmt.Println(string(s))
+	go takeData(s)
+}
+
+func pingtest(db *sql.DB) {
+	var err = db.Ping()
+	if err != nil {
+		fmt.Println("连接失败")
+		return
+	} else {
+		fmt.Println("连接成功")
+	}
+}
+
+/*重构添加和查询*/
+func (dbw *DbWorker) inserData(player Dbplayer) {
+	/*准备中参数是空的*/
+	stmt, err := dbw.DB.Prepare("insert into player(id,name,itemone,itemtwo) values (?,?,?,?)")
+	defer stmt.Close()
+	if err != nil {
+		fmt.Println("准备失败")
+		return
+	}
+	/*这里把参数放进去*/
+	ret, err2 := stmt.Exec(player.Id, player.Name, player.Itemone, player.Itemtwo)
+	/*返回参数和判错*/
+	if err2 != nil {
+		fmt.Println("插入失败")
+		return
+	}
+	if LastInsertID, err := ret.LastInsertId(); nil == err {
+		fmt.Println("id", LastInsertID)
+	}
+	if RowsAffected, err := ret.RowsAffected(); nil == err {
+		fmt.Println("行号", RowsAffected)
+	}
+
+}
+
+func conncetMysql(player Dbplayer) {
+	dbw := DbWorker{
+		Dsn: "root:314330@lkx@tcp(192.168.240.132:3306)/testone?charset=utf8",
+		DB:  nil,
+	}
+	dbtemp, err := sql.Open("mysql", dbw.Dsn)
+	dbw.DB = dbtemp
+	if err != nil {
+		panic(err)
+		fmt.Print(err)
+		return
+	}
+	pingtest(dbw.DB)
+	defer dbw.DB.Close()
+	dbw.inserData(player)
+}
+
+/*自定义的handler*/
+
+func httpServer() {
+	/*这个自定义程度好像有点高*/
+	var server = http.Server{
+		Addr:         "192.168.240.131:8080", /*端口号*/
+		ReadTimeout:  0,
+		WriteTimeout: 0,
+	}
+	var mux = http.NewServeMux()
+	mux.HandleFunc("/", myfunction)
+	server.Handler = mux
+	/*这里不能少，要把定义的hardler 放进去*/
+	err := server.ListenAndServe()
+	if err != nil {
+		return
+	}
+}
+
+/*监听开启后，一旦客户端请求，go就开启一个协程去处理*/
+/*
+完整的流程
+Request -> ServeMux(Multiplexer) -> handler -> Response
+*/
+
+/*func main() {
+	fmt.Println("this is http server")
+	httpServer()
+}
+*/
